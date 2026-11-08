@@ -1,5 +1,8 @@
 # Sistema de Autenticação
 
+[![CI](https://github.com/EliasCamposDEV/sistema-autenticacao/actions/workflows/ci.yml/badge.svg)](https://github.com/EliasCamposDEV/sistema-autenticacao/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/EliasCamposDEV/sistema-autenticacao)](LICENSE)
+
 Autenticação com JWT de curta duração e refresh token opaco rotativo, com detecção de reuso e revogação por família. Node.js 22, Express 5, MongoDB, Mongoose.
 
 ## Rodar
