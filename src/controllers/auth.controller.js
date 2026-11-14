@@ -31,3 +31,16 @@ export async function me(req, res) {
   const user = await authService.getCurrentUser(req.user.id);
   res.json({ user });
 }
+
+export async function forgotPassword(req, res) {
+  const result = await authService.requestPasswordReset(req.validated.body.email);
+  res.json(result);
+}
+
+export async function resetPassword(req, res) {
+  const result = await authService.resetPassword(
+    req.validated.body.token,
+    req.validated.body.password
+  );
+  res.json(result);
+}

@@ -57,6 +57,8 @@ Base: `/api/v1/auth`
 | POST | `/login` | não | Autentica e retorna tokens |
 | POST | `/refresh` | refresh token | Rotaciona o par de tokens |
 | POST | `/logout` | refresh token | Revoga a família de sessões |
+| POST | `/forgot-password` | não | Solicita token de redefinição de senha |
+| POST | `/reset-password` | não | Redefine a senha com o token |
 | GET | `/me` | bearer | Retorna o usuário autenticado |
 
 Health check: `GET /health` retorna `200` com o banco conectado e `503` quando o MongoDB está fora.

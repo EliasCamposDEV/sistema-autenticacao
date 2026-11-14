@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { User } from '../models/user.js';
 import { RefreshToken } from '../models/refresh-token.js';
+import { PasswordResetToken, generateResetToken } from '../models/password-reset-token.js';
 import { AppError } from '../errors.js';
 import { config } from '../config.js';
 import {
@@ -14,6 +15,7 @@ import {
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('invalid-password-placeholder', config.bcryptRounds);
 
 const REFRESH_TOKEN_TTL_MS = config.refreshTokenTtlDays * 24 * 60 * 60 * 1000;
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 function normalizeEmail(email) {
   return email.trim().toLowerCase();
@@ -44,6 +46,13 @@ async function createSession(user, meta, familyId = crypto.randomUUID()) {
 async function revokeFamily(familyId) {
   await RefreshToken.updateMany(
     { familyId, revokedAt: null },
+    { $set: { revokedAt: new Date() } }
+  );
+}
+
+async function revokeAllForUser(userId) {
+  await RefreshToken.updateMany(
+    { user: userId, revokedAt: null },
     { $set: { revokedAt: new Date() } }
   );
 }
@@ -157,4 +166,61 @@ export async function getCurrentUser(userId) {
   }
 
   return user.toJSON();
+}
+
+export async function requestPasswordReset(email) {
+  const normalizedEmail = normalizeEmail(email);
+  const user = await User.findOne({ email: normalizedEmail });
+
+  // Resposta generica para nao revelar se o e-mail existe.
+  if (!user || !user.active) {
+    return { message: 'Se o e-mail existir, um link de redefinicao sera enviado' };
+  }
+
+  await PasswordResetToken.deleteMany({ user: user._id, usedAt: null });
+
+  const resetToken = generateResetToken();
+  await PasswordResetToken.create({
+    user: user._id,
+    tokenHash: hashToken(resetToken),
+    expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS)
+  });
+
+  // Em producao, envie o token por e-mail em vez de retornar na resposta.
+  return {
+    message: 'Se o e-mail existir, um link de redefinicao sera enviado',
+    resetToken
+  };
+}
+
+export async function resetPassword(token, newPassword) {
+  const stored = await PasswordResetToken.findOne({ tokenHash: hashToken(token) });
+
+  if (!stored) {
+    throw new AppError(400, 'INVALID_RESET_TOKEN', 'Token de redefinicao invalido');
+  }
+
+  if (stored.usedAt) {
+    throw new AppError(400, 'RESET_TOKEN_USED', 'Token de redefinicao ja utilizado');
+  }
+
+  if (stored.expiresAt.getTime() <= Date.now()) {
+    throw new AppError(400, 'RESET_TOKEN_EXPIRED', 'Token de redefinicao expirado');
+  }
+
+  const user = await User.findById(stored.user).select('+passwordHash');
+
+  if (!user || !user.active) {
+    throw new AppError(400, 'INVALID_RESET_TOKEN', 'Token de redefinicao invalido');
+  }
+
+  user.passwordHash = await bcrypt.hash(newPassword, config.bcryptRounds);
+  await user.save();
+
+  stored.usedAt = new Date();
+  await stored.save();
+
+  await revokeAllForUser(user._id);
+
+  return { message: 'Senha redefinida com sucesso' };
 }

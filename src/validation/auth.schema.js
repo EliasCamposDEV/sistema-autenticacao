@@ -41,3 +41,18 @@ export const refreshSchema = z.object({
       .min(1, 'O refresh token e obrigatorio')
   })
 });
+
+export const forgotPasswordSchema = z.object({
+  body: z.object({
+    email: emailSchema
+  })
+});
+
+export const resetPasswordSchema = z.object({
+  body: z.object({
+    token: z
+      .string({ required_error: 'O token e obrigatorio' })
+      .min(1, 'O token e obrigatorio'),
+    password: passwordSchema
+  })
+});

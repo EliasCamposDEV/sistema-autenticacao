@@ -17,6 +17,7 @@ const VALID_USER = {
 let app;
 let User;
 let RefreshToken;
+let PasswordResetToken;
 let mongoServer;
 
 async function register(overrides = {}) {
@@ -48,9 +49,11 @@ before(async () => {
   app = (await import('../src/app.js')).createApp();
   User = (await import('../src/models/user.js')).User;
   RefreshToken = (await import('../src/models/refresh-token.js')).RefreshToken;
+  PasswordResetToken = (await import('../src/models/password-reset-token.js')).PasswordResetToken;
 
   await User.init();
   await RefreshToken.init();
+  await PasswordResetToken.init();
 });
 
 after(async () => {
@@ -61,6 +64,7 @@ after(async () => {
 beforeEach(async () => {
   await User.deleteMany({});
   await RefreshToken.deleteMany({});
+  await PasswordResetToken.deleteMany({});
 });
 
 describe('Sistema de autenticação', () => {
@@ -206,5 +210,80 @@ describe('Sistema de autenticação', () => {
     } finally {
       await mongoose.connect(mongoServer.getUri());
     }
+  });
+
+  it('solicita redefinicao de senha sem revelar se o e-mail existe', async () => {
+    const unknown = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: 'ninguem@email.com' });
+    assert.equal(unknown.status, 200);
+    assert.equal(unknown.body.resetToken, undefined);
+
+    await register();
+    const known = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+    assert.equal(known.status, 200);
+    assert.ok(known.body.resetToken);
+  });
+
+  it('redefine a senha e revoga as sessoes antigas', async () => {
+    const session = await register();
+    const forgot = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+
+    const reset = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({ token: forgot.body.resetToken, password: 'NovaSenhaSegura123' });
+    assert.equal(reset.status, 200);
+
+    const oldLogin = await login();
+    assert.equal(oldLogin.status, 401);
+    assert.equal(oldLogin.body.code, 'INVALID_CREDENTIALS');
+
+    const newLogin = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: VALID_USER.email, password: 'NovaSenhaSegura123' });
+    assert.equal(newLogin.status, 200);
+
+    const reused = await refresh(session.body.refreshToken);
+    assert.equal(reused.status, 401);
+  });
+
+  it('rejeita token de redefinicao invalido, usado ou expirado', async () => {
+    await register();
+    const forgot = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+
+    const invalid = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({ token: 'token-invalido', password: 'NovaSenhaSegura123' });
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.body.code, 'INVALID_RESET_TOKEN');
+
+    await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({ token: forgot.body.resetToken, password: 'NovaSenhaSegura123' });
+
+    const reused = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({ token: forgot.body.resetToken, password: 'OutraSenhaSegura123' });
+    assert.equal(reused.status, 400);
+    assert.equal(reused.body.code, 'RESET_TOKEN_USED');
+  });
+
+  it('valida a nova senha na redefinicao', async () => {
+    await register();
+    const forgot = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+
+    const weak = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({ token: forgot.body.resetToken, password: 'fraca' });
+    assert.equal(weak.status, 400);
+    assert.equal(weak.body.code, 'VALIDATION_ERROR');
   });
 });
