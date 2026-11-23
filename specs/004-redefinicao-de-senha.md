@@ -92,7 +92,7 @@ Solicitar e concluir a redefinição de senha com token de uso único, resposta 
 - Redefinição com token válido retorna 200.
 - Login com senha antiga falha e com a nova funciona.
 - Refresh token anterior é recusado depois da redefinição.
-- Token inválido, usado e com senha fraca retornam os códigos esperados.
+- Token inválido, usado, expirado e senha fraca retornam os códigos esperados.
 - Com `NODE_ENV=production`, a resposta de e-mail cadastrado e desconhecido é idêntica e sem `resetToken`.
 - Duas redefinições concorrentes com o mesmo token produzem um sucesso e um `RESET_TOKEN_USED`.
 - Dois pedidos concorrentes de token mantêm apenas um token ativo e invalidam o token substituído.
