@@ -87,7 +87,7 @@ Códigos de erro: `VALIDATION_ERROR`, `INVALID_JSON`, `PAYLOAD_TOO_LARGE`, `INVA
 npm.cmd test
 ```
 
-24 testes de integração cobrem cadastro, e-mail duplicado, validação, login, conta inativa, rota protegida, access token expirado ou de tipo errado, rotação, expiração e reutilização de refresh token, rotação concorrente, logout, 404, JSON inválido, corpo acima de 10 kb, rate limit atrás de proxy, CORS, health check com o banco fora, redefinição de senha, revogação das sessões antigas, consumo único do token sob concorrência e ausência de `resetToken` em produção.
+26 testes de integração e unitários cobrem cadastro, e-mail duplicado, validação, login, conta inativa, rota protegida, access token expirado ou de tipo errado, rotação, expiração e reutilização de refresh token, rotação concorrente, logout, 404, JSON inválido, corpo acima de 10 kb, rate limit atrás de proxy, CORS, health check com o banco fora, redefinição de senha, revogação das sessões antigas, consumo único do token sob concorrência, ausência de `resetToken` em produção e template de e-mail com link opcional.
 
 ## Documentação
 

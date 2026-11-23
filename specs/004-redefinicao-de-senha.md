@@ -103,6 +103,7 @@ Solicitar e concluir a redefinição de senha com token de uso único, resposta 
 - Token inválido, usado, expirado e senha fraca retornam os códigos esperados.
 - Com `NODE_ENV=production`, a resposta de e-mail cadastrado e desconhecido é idêntica e sem `resetToken`.
 - Fora de teste, o token é enviado por e-mail quando o SMTP está configurado; com SMTP ausente, a tentativa é registrada sem falhar a requisição.
+- O template de e-mail inclui link quando `PASSWORD_RESET_URL` está configurado e sempre inclui o token.
 - Duas redefinições concorrentes com o mesmo token produzem um sucesso e um `RESET_TOKEN_USED`.
 - Dois pedidos concorrentes de token mantêm apenas um token ativo e invalidam o token substituído.
 
