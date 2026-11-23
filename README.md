@@ -79,7 +79,11 @@ Códigos de erro: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_CREDENTIALS`, `UN
 npm.cmd test
 ```
 
-10 testes de integração cobrem cadastro, e-mail duplicado, validação, login, rota protegida, rotação e reutilização de refresh token, logout, 404, JSON inválido e health check com o banco fora.
+14 testes de integração cobrem cadastro, e-mail duplicado, validação, login, rota protegida, rotação e reutilização de refresh token, logout, 404, JSON inválido, health check com o banco fora, redefinição de senha e revogação das sessões antigas.
+
+## Documentação
+
+- [specs/](specs/) - specs numeradas (001 registro e login, 002 refresh token e famílias, 003 proteção de rotas, 004 redefinição de senha, 005 operação e segurança periférica).
 
 ## Notas
 
