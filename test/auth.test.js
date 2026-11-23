@@ -42,6 +42,12 @@ async function refresh(refreshToken) {
     .send({ refreshToken });
 }
 
+async function resetPassword(token, password) {
+  return request(app)
+    .post('/api/v1/auth/reset-password')
+    .send({ token, password });
+}
+
 before(async () => {
   mongoServer = await MongoMemoryServer.create();
   await mongoose.connect(mongoServer.getUri());
@@ -212,7 +218,7 @@ describe('Sistema de autenticação', () => {
     }
   });
 
-  it('solicita redefinicao de senha sem revelar se o e-mail existe', async () => {
+  it('solicita redefinicao e so expoe o token em teste', async () => {
     const unknown = await request(app)
       .post('/api/v1/auth/forgot-password')
       .send({ email: 'ninguem@email.com' });
@@ -285,5 +291,58 @@ describe('Sistema de autenticação', () => {
       .send({ token: forgot.body.resetToken, password: 'fraca' });
     assert.equal(weak.status, 400);
     assert.equal(weak.body.code, 'VALIDATION_ERROR');
+  });
+
+  it('consome o token de redefinicao uma unica vez sob concorrencia', async () => {
+    await register();
+    const forgot = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+
+    const passwords = ['PrimeiraSenha123', 'SegundaSenha123'];
+    const responses = await Promise.all(
+      passwords.map((password) => resetPassword(forgot.body.resetToken, password))
+    );
+
+    assert.equal(responses.filter((response) => response.status === 200).length, 1);
+
+    const successfulIndex = responses.findIndex((response) => response.status === 200);
+    const failedIndex = 1 - successfulIndex;
+    assert.equal(responses[failedIndex].status, 400);
+    assert.equal(responses[failedIndex].body.code, 'RESET_TOKEN_USED');
+
+    const winner = await login({ password: passwords[successfulIndex] });
+    assert.equal(winner.status, 200);
+
+    const loser = await login({ password: passwords[failedIndex] });
+    assert.equal(loser.status, 401);
+  });
+
+  it('mantem apenas um token de redefinicao ativo sob concorrencia', async () => {
+    await register();
+    const user = await User.findOne({ email: VALID_USER.email });
+
+    const responses = await Promise.all([
+      request(app).post('/api/v1/auth/forgot-password').send({ email: VALID_USER.email }),
+      request(app).post('/api/v1/auth/forgot-password').send({ email: VALID_USER.email })
+    ]);
+
+    assert.deepEqual(responses.map((response) => response.status), [200, 200]);
+    assert.equal(
+      await PasswordResetToken.countDocuments({ user: user._id, usedAt: null }),
+      1
+    );
+
+    const attempts = await Promise.all(
+      responses.map((response) => resetPassword(response.body.resetToken, 'NovaSenhaSegura123'))
+    );
+
+    assert.equal(attempts.filter((response) => response.status === 200).length, 1);
+    assert.equal(
+      attempts.filter(
+        (response) => response.status === 400 && response.body.code === 'INVALID_RESET_TOKEN'
+      ).length,
+      1
+    );
   });
 });

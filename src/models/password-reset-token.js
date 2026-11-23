@@ -6,8 +6,7 @@ const passwordResetTokenSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
-      index: true
+      required: true
     },
     tokenHash: {
       type: String,
@@ -32,6 +31,12 @@ const passwordResetTokenSchema = new mongoose.Schema(
 
 // O MongoDB remove os documentos expirados automaticamente.
 passwordResetTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+// Garante no maximo um token ativo por usuario. Tokens ja usados ficam fora do indice.
+passwordResetTokenSchema.index(
+  { user: 1 },
+  { unique: true, partialFilterExpression: { usedAt: null } }
+);
 
 export const PasswordResetToken = mongoose.model('PasswordResetToken', passwordResetTokenSchema);
 

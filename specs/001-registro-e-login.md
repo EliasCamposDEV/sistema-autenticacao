@@ -104,7 +104,7 @@ Registrar usuários e autenticar credenciais, devolvendo um par de tokens (acces
 - [x] Usuário inativo não autentica.
 
 ## Limitacoes e riscos
-- `forgot-password` devolve o token na resposta em qualquer ambiente. Em produção é preciso enviar por e-mail e remover o campo da resposta.
+- `forgot-password` só devolve o token na resposta com `NODE_ENV=test`. Em produção o envio por e-mail ainda precisa ser integrado.
 - Não há verificação de e-mail nem bloqueio por tentativas de login por credencial. O limite existente é global por IP.
 
 ## Decisoes

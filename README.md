@@ -71,7 +71,7 @@ curl -X POST http://localhost:3000/api/v1/auth/register \
   -d '{"name":"Maria Silva","email":"maria@email.com","password":"SenhaSegura123"}'
 ```
 
-Códigos de erro: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_CREDENTIALS`, `UNAUTHORIZED`, `TOKEN_EXPIRED`, `INVALID_TOKEN`, `INVALID_REFRESH_TOKEN`, `REFRESH_TOKEN_EXPIRED`, `REFRESH_TOKEN_REUSED`, `ACCOUNT_DISABLED`, `EMAIL_ALREADY_EXISTS`, `RATE_LIMITED`, `ROUTE_NOT_FOUND`, `INTERNAL_ERROR`.
+Códigos de erro: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_CREDENTIALS`, `UNAUTHORIZED`, `TOKEN_EXPIRED`, `INVALID_TOKEN`, `INVALID_REFRESH_TOKEN`, `REFRESH_TOKEN_EXPIRED`, `REFRESH_TOKEN_REUSED`, `ACCOUNT_DISABLED`, `EMAIL_ALREADY_EXISTS`, `INVALID_RESET_TOKEN`, `RESET_TOKEN_USED`, `RESET_TOKEN_EXPIRED`, `RATE_LIMITED`, `ROUTE_NOT_FOUND`, `INTERNAL_ERROR`.
 
 ## Testes
 
@@ -79,7 +79,7 @@ Códigos de erro: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_CREDENTIALS`, `UN
 npm.cmd test
 ```
 
-14 testes de integração cobrem cadastro, e-mail duplicado, validação, login, rota protegida, rotação e reutilização de refresh token, logout, 404, JSON inválido, health check com o banco fora, redefinição de senha e revogação das sessões antigas.
+17 testes de integração cobrem cadastro, e-mail duplicado, validação, login, rota protegida, rotação e reutilização de refresh token, logout, 404, JSON inválido, health check com o banco fora, redefinição de senha, revogação das sessões antigas, consumo único do token sob concorrência e ausência de `resetToken` em produção.
 
 ## Documentação
 
@@ -90,4 +90,5 @@ npm.cmd test
 - Refresh token é opaco (não é JWT) e armazenado apenas como hash SHA-256.
 - Rotação + família de tokens permite detectar reuso de refresh token e encerrar todas as sessões relacionadas.
 - Índice TTL remove tokens expirados automaticamente.
+- O token de redefinição só aparece na resposta com `NODE_ENV=test`; em produção ele é apenas gravado e o envio por e-mail ainda precisa ser integrado.
 - `CORS_ORIGIN` deve incluir a URL do frontend em produção.

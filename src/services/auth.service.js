@@ -17,6 +17,8 @@ const DUMMY_PASSWORD_HASH = bcrypt.hashSync('invalid-password-placeholder', conf
 const REFRESH_TOKEN_TTL_MS = config.refreshTokenTtlDays * 24 * 60 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
+const RESET_MESSAGE = 'Se o e-mail existir, um link de redefinicao sera enviado';
+
 function normalizeEmail(email) {
   return email.trim().toLowerCase();
 }
@@ -55,6 +57,38 @@ async function revokeAllForUser(userId) {
     { user: userId, revokedAt: null },
     { $set: { revokedAt: new Date() } }
   );
+}
+
+async function issueResetToken(user) {
+  const resetToken = generateResetToken();
+  const tokenHash = hashToken(resetToken);
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+  const update = { $set: { tokenHash, expiresAt, usedAt: null } };
+
+  try {
+    await PasswordResetToken.findOneAndUpdate(
+      { user: user._id, usedAt: null },
+      update,
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+    );
+  } catch (error) {
+    if (error.code !== 11000) {
+      throw error;
+    }
+
+    // Outra requisicao criou o token ativo entre a busca e o upsert.
+    const existing = await PasswordResetToken.findOneAndUpdate(
+      { user: user._id, usedAt: null },
+      update,
+      { returnDocument: 'after' }
+    );
+
+    if (!existing) {
+      throw error;
+    }
+  }
+
+  return resetToken;
 }
 
 export async function register({ name, email, password }, meta) {
@@ -174,27 +208,24 @@ export async function requestPasswordReset(email) {
 
   // Resposta generica para nao revelar se o e-mail existe.
   if (!user || !user.active) {
-    return { message: 'Se o e-mail existir, um link de redefinicao sera enviado' };
+    return { message: RESET_MESSAGE };
   }
 
-  await PasswordResetToken.deleteMany({ user: user._id, usedAt: null });
+  const resetToken = await issueResetToken(user);
+  const response = { message: RESET_MESSAGE };
 
-  const resetToken = generateResetToken();
-  await PasswordResetToken.create({
-    user: user._id,
-    tokenHash: hashToken(resetToken),
-    expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS)
-  });
+  // O token so aparece na API em teste. Em producao, ele deve ser enviado por e-mail.
+  if (config.isTest) {
+    response.resetToken = resetToken;
+  }
 
-  // Em producao, envie o token por e-mail em vez de retornar na resposta.
-  return {
-    message: 'Se o e-mail existir, um link de redefinicao sera enviado',
-    resetToken
-  };
+  return response;
 }
 
 export async function resetPassword(token, newPassword) {
-  const stored = await PasswordResetToken.findOne({ tokenHash: hashToken(token) });
+  const tokenHash = hashToken(token);
+  const now = new Date();
+  const stored = await PasswordResetToken.findOne({ tokenHash });
 
   if (!stored) {
     throw new AppError(400, 'INVALID_RESET_TOKEN', 'Token de redefinicao invalido');
@@ -204,11 +235,33 @@ export async function resetPassword(token, newPassword) {
     throw new AppError(400, 'RESET_TOKEN_USED', 'Token de redefinicao ja utilizado');
   }
 
-  if (stored.expiresAt.getTime() <= Date.now()) {
+  if (stored.expiresAt.getTime() <= now.getTime()) {
     throw new AppError(400, 'RESET_TOKEN_EXPIRED', 'Token de redefinicao expirado');
   }
 
-  const user = await User.findById(stored.user).select('+passwordHash');
+  // Consome o token antes de alterar a senha. O filtro por hash e usedAt: null
+  // garante que apenas uma requisicao consiga usar este token.
+  const claimed = await PasswordResetToken.findOneAndUpdate(
+    { _id: stored._id, tokenHash, usedAt: null, expiresAt: { $gt: now } },
+    { $set: { usedAt: now } },
+    { returnDocument: 'before' }
+  );
+
+  if (!claimed) {
+    const current = await PasswordResetToken.findById(stored._id);
+
+    if (!current || current.tokenHash !== tokenHash) {
+      throw new AppError(400, 'INVALID_RESET_TOKEN', 'Token de redefinicao invalido');
+    }
+
+    if (current.usedAt) {
+      throw new AppError(400, 'RESET_TOKEN_USED', 'Token de redefinicao ja utilizado');
+    }
+
+    throw new AppError(400, 'RESET_TOKEN_EXPIRED', 'Token de redefinicao expirado');
+  }
+
+  const user = await User.findById(claimed.user).select('+passwordHash');
 
   if (!user || !user.active) {
     throw new AppError(400, 'INVALID_RESET_TOKEN', 'Token de redefinicao invalido');
@@ -217,10 +270,12 @@ export async function resetPassword(token, newPassword) {
   user.passwordHash = await bcrypt.hash(newPassword, config.bcryptRounds);
   await user.save();
 
-  stored.usedAt = new Date();
-  await stored.save();
-
   await revokeAllForUser(user._id);
+  await PasswordResetToken.deleteMany({
+    user: user._id,
+    usedAt: null,
+    _id: { $ne: claimed._id }
+  });
 
   return { message: 'Senha redefinida com sucesso' };
 }
