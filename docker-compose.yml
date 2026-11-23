@@ -28,6 +28,13 @@ services:
       REFRESH_TOKEN_TTL_DAYS: 7
       BCRYPT_ROUNDS: 12
       CORS_ORIGIN: "${CORS_ORIGIN:?defina CORS_ORIGIN no .env}"
+      EMAIL_FROM: "${EMAIL_FROM:-}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_SECURE: "${SMTP_SECURE:-false}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASS: "${SMTP_PASS:-}"
+      PASSWORD_RESET_URL: "${PASSWORD_RESET_URL:-}"
     ports:
       - "127.0.0.1:3001:3000"
     healthcheck:

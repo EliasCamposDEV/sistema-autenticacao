@@ -47,6 +47,13 @@ API em http://127.0.0.1:3001, MongoDB apenas na rede interna. Para inspecionar: 
 | `CORS_ORIGIN` | * | Origens permitidas, separadas por vírgula |
 | `RATE_LIMIT_WINDOW_MS` | 900000 | Janela do rate limit |
 | `RATE_LIMIT_MAX` | 20 | Máximo de requisições por janela |
+| `EMAIL_FROM` | vazio | Remetente do e-mail de redefinição |
+| `SMTP_HOST` | vazio | Host SMTP; vazio desativa o envio real |
+| `SMTP_PORT` | 587 | Porta SMTP |
+| `SMTP_SECURE` | false | `true` usa TLS direto na porta |
+| `SMTP_USER` | vazio | Usuário SMTP |
+| `SMTP_PASS` | vazio | Senha SMTP |
+| `PASSWORD_RESET_URL` | vazio | URL base opcional para o link de redefinição |
 
 ## Endpoints
 

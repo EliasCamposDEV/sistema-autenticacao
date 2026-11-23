@@ -4,6 +4,7 @@ import { User } from '../models/user.js';
 import { RefreshToken } from '../models/refresh-token.js';
 import { PasswordResetToken, generateResetToken } from '../models/password-reset-token.js';
 import { AppError } from '../errors.js';
+import { sendPasswordResetEmail } from './mail.service.js';
 import { config } from '../config.js';
 import {
   createAccessToken,
@@ -214,9 +215,16 @@ export async function requestPasswordReset(email) {
   const resetToken = await issueResetToken(user);
   const response = { message: RESET_MESSAGE };
 
-  // O token so aparece na API em teste. Em producao, ele deve ser enviado por e-mail.
+  // O token so aparece na API em teste. Fora de teste, ele e enviado por e-mail
+  // quando o SMTP estiver configurado.
   if (config.isTest) {
     response.resetToken = resetToken;
+  } else {
+    try {
+      await sendPasswordResetEmail({ to: user.email, token: resetToken });
+    } catch (error) {
+      console.error('[mail] falha ao enviar e-mail de redefinicao:', error.message);
+    }
   }
 
   return response;

@@ -9,7 +9,7 @@ Um usuário que esqueceu a senha precisa recuperar o acesso sem intervenção do
 Solicitar e concluir a redefinição de senha com token de uso único, resposta genérica para e-mails desconhecidos e revogação de todas as sessões do usuário.
 
 ## Fora de escopo
-- Envio real de e-mail. O token é gerado e gravado em todos os ambientes, mas só aparece na resposta com `NODE_ENV=test`. Em produção, a entrega precisa ser integrada a um provedor de e-mail.
+- Envio real de e-mail. Implementado via SMTP configurável. Sem `SMTP_HOST` e `EMAIL_FROM`, o token é gravado, mas não é entregue.
 - Link com token na URL do frontend.
 - Limite de tentativas específico para o token de redefinição, além do limite global por IP.
 - Perguntas de segurança.
@@ -27,6 +27,7 @@ Solicitar e concluir a redefinição de senha com token de uso único, resposta 
 - RF10: O token é consumido com update atômico antes da troca de senha: só uma requisição concorrente consegue marcar `usedAt`.
 - RF11: Ao redefinir, todas as sessões ativas do usuário são revogadas.
 - RF12: Depois da redefinição, a senha antiga deixa de autenticar e os refresh tokens anteriores são recusados.
+- RF13: Fora de teste, o token é enviado por e-mail quando o SMTP está configurado. Falhas de envio são registradas sem revelar se o e-mail existe.
 
 ## Requisitos nao funcionais
 - RNF1: Hash SHA-256 para o token de redefinição, o mesmo utilitário usado no refresh token.
@@ -75,7 +76,14 @@ Solicitar e concluir a redefinição de senha com token de uso único, resposta 
 | Propriedade | Padrao | Uso |
 |-------------|--------|-----|
 | `BCRYPT_ROUNDS` | 12 (4 em teste) | Custo do novo hash de senha |
-| `NODE_ENV` | development | Só em `test` o `resetToken` aparece na resposta; nos demais ambientes ele fica apenas no banco |
+| `NODE_ENV` | development | Só em `test` o `resetToken` aparece na resposta; nos demais ambientes ele é enviado por e-mail quando o SMTP está configurado |
+| `EMAIL_FROM` | vazio | Remetente do e-mail de redefinição |
+| `SMTP_HOST` | vazio | Host SMTP; vazio desativa o envio real |
+| `SMTP_PORT` | 587 | Porta SMTP |
+| `SMTP_SECURE` | false | `true` usa TLS direto |
+| `SMTP_USER` | vazio | Usuário SMTP |
+| `SMTP_PASS` | vazio | Senha SMTP |
+| `PASSWORD_RESET_URL` | vazio | URL base opcional para o link de redefinição |
 
 ## Erros esperados
 | Status | Codigo | Quando |
@@ -94,6 +102,7 @@ Solicitar e concluir a redefinição de senha com token de uso único, resposta 
 - Refresh token anterior é recusado depois da redefinição.
 - Token inválido, usado, expirado e senha fraca retornam os códigos esperados.
 - Com `NODE_ENV=production`, a resposta de e-mail cadastrado e desconhecido é idêntica e sem `resetToken`.
+- Fora de teste, o token é enviado por e-mail quando o SMTP está configurado; com SMTP ausente, a tentativa é registrada sem falhar a requisição.
 - Duas redefinições concorrentes com o mesmo token produzem um sucesso e um `RESET_TOKEN_USED`.
 - Dois pedidos concorrentes de token mantêm apenas um token ativo e invalidam o token substituído.
 
@@ -114,7 +123,7 @@ Solicitar e concluir a redefinição de senha com token de uso único, resposta 
 - [x] Token inválido, usado e expirado têm códigos distintos.
 
 ## Limitacoes e riscos
-- O envio de e-mail não está implementado. Em produção o token é gerado e gravado, mas não chega ao usuário sem integrar um provedor.
+- O envio real depende de SMTP configurado. Sem `SMTP_HOST` e `EMAIL_FROM`, o token é gravado, mas não é entregue.
 - Não há limite de requisições específico para `forgot-password`, apenas o limite global por IP.
 - Access tokens emitidos antes da redefinição continuam válidos até expirar, pois não há `tokenVersion` no JWT.
 - Se um banco existente tiver mais de um token ativo para o mesmo usuário, o índice único parcial falha na criação e exige limpeza prévia.
@@ -125,3 +134,4 @@ Solicitar e concluir a redefinição de senha com token de uso único, resposta 
 - Upsert do token ativo em vez de `deleteMany` seguido de `create`: evita duplicidade sob concorrência.
 - Consumo atômico antes da troca de senha: garante uso único mesmo com requisições simultâneas.
 - Revogar todas as sessões na redefinição: prioriza segurança sobre conveniência do usuário.
+- Envio por SMTP configurável: evita dependência de provedor específico e mantém a API funcional em desenvolvimento sem credenciais.

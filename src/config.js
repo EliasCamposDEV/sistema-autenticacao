@@ -90,5 +90,16 @@ export const config = deepFreeze({
   rateLimit: {
     windowMs: numberFromEnv('RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
     max: numberFromEnv('RATE_LIMIT_MAX', 20)
+  },
+  email: {
+    from: process.env.EMAIL_FROM || null,
+    resetUrlBase: process.env.PASSWORD_RESET_URL || null,
+    smtp: {
+      host: process.env.SMTP_HOST || null,
+      port: numberFromEnv('SMTP_PORT', 587),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER || null,
+      pass: process.env.SMTP_PASS || null
+    }
   }
 });
