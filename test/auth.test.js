@@ -278,6 +278,22 @@ describe('Sistema de autenticação', () => {
       .send({ token: forgot.body.resetToken, password: 'OutraSenhaSegura123' });
     assert.equal(reused.status, 400);
     assert.equal(reused.body.code, 'RESET_TOKEN_USED');
+
+    const expiredRequest = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+    const user = await User.findOne({ email: VALID_USER.email });
+
+    await PasswordResetToken.updateOne(
+      { user: user._id, usedAt: null },
+      { $set: { expiresAt: new Date(Date.now() - 1000) } }
+    );
+
+    const expired = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({ token: expiredRequest.body.resetToken, password: 'OutraSenhaSegura123' });
+    assert.equal(expired.status, 400);
+    assert.equal(expired.body.code, 'RESET_TOKEN_EXPIRED');
   });
 
   it('valida a nova senha na redefinicao', async () => {
