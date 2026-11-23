@@ -15,6 +15,14 @@ export function errorHandler(error, _req, res, next) {
     });
   }
 
+  if (error.type === 'entity.too.large') {
+    return res.status(413).json({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: 'Corpo da requisicao excede o limite de 10 kb',
+      timestamp: new Date().toISOString()
+    });
+  }
+
   if (error.type === 'entity.parse.failed') {
     return res.status(400).json({
       code: 'INVALID_JSON',

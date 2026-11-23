@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
+import jwt from 'jsonwebtoken';
 import request from 'supertest';
 
 process.env.NODE_ENV = 'test';
@@ -46,6 +47,19 @@ async function resetPassword(token, password) {
   return request(app)
     .post('/api/v1/auth/reset-password')
     .send({ token, password });
+}
+
+function signAccessToken(userId, { type = 'access', expiresIn = 900 } = {}) {
+  return jwt.sign(
+    { sub: userId, role: 'user', type },
+    process.env.JWT_ACCESS_SECRET,
+    {
+      algorithm: 'HS256',
+      expiresIn,
+      issuer: 'sistema-autenticacao',
+      audience: 'sistema-autenticacao-api'
+    }
+  );
 }
 
 before(async () => {
@@ -139,6 +153,17 @@ describe('Sistema de autenticação', () => {
     assert.equal(unknownEmail.body.code, 'INVALID_CREDENTIALS');
   });
 
+  it('bloqueia login de usuario inativo', async () => {
+    await register();
+    const user = await User.findOne({ email: VALID_USER.email });
+    user.active = false;
+    await user.save();
+
+    const response = await login();
+    assert.equal(response.status, 403);
+    assert.equal(response.body.code, 'ACCOUNT_DISABLED');
+  });
+
   it('protege a rota /me com access token', async () => {
     const session = await register();
 
@@ -161,6 +186,32 @@ describe('Sistema de autenticação', () => {
     assert.equal(invalid.body.code, 'INVALID_TOKEN');
   });
 
+  it('rejeita access token expirado, de tipo errado e de usuario inativo', async () => {
+    const session = await register();
+    const user = await User.findOne({ email: VALID_USER.email });
+
+    const expired = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${signAccessToken(user.id, { expiresIn: -1 })}`);
+    assert.equal(expired.status, 401);
+    assert.equal(expired.body.code, 'TOKEN_EXPIRED');
+
+    const wrongType = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${signAccessToken(user.id, { type: 'refresh' })}`);
+    assert.equal(wrongType.status, 401);
+    assert.equal(wrongType.body.code, 'INVALID_TOKEN');
+
+    user.active = false;
+    await user.save();
+
+    const inactive = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${session.body.accessToken}`);
+    assert.equal(inactive.status, 401);
+    assert.equal(inactive.body.code, 'INVALID_TOKEN');
+  });
+
   it('rotaciona o refresh token e detecta reutilizacao', async () => {
     const session = await register();
     const firstRefreshToken = session.body.refreshToken;
@@ -176,6 +227,49 @@ describe('Sistema de autenticação', () => {
 
     const familyRevoked = await refresh(rotated.body.refreshToken);
     assert.equal(familyRevoked.status, 401);
+  });
+
+  it('rejeita refresh token expirado e de usuario inativo', async () => {
+    const session = await register();
+    const user = await User.findOne({ email: VALID_USER.email });
+
+    await RefreshToken.updateMany(
+      { user: user._id },
+      { $set: { expiresAt: new Date(Date.now() - 1000) } }
+    );
+
+    const expired = await refresh(session.body.refreshToken);
+    assert.equal(expired.status, 401);
+    assert.equal(expired.body.code, 'REFRESH_TOKEN_EXPIRED');
+
+    const secondSession = await login();
+    user.active = false;
+    await user.save();
+
+    const inactive = await refresh(secondSession.body.refreshToken);
+    assert.equal(inactive.status, 401);
+    assert.equal(inactive.body.code, 'INVALID_REFRESH_TOKEN');
+  });
+
+  it('trata rotacao concorrente de refresh token', async () => {
+    const session = await register();
+
+    const responses = await Promise.all([
+      refresh(session.body.refreshToken),
+      refresh(session.body.refreshToken)
+    ]);
+
+    assert.deepEqual(
+      responses.map((response) => response.status).sort(),
+      [200, 401]
+    );
+
+    const loser = responses.find((response) => response.status === 401);
+    assert.equal(loser.body.code, 'REFRESH_TOKEN_REUSED');
+
+    const winner = responses.find((response) => response.status === 200);
+    const afterRace = await refresh(winner.body.refreshToken);
+    assert.equal(afterRace.status, 401);
   });
 
   it('faz logout encerrando a familia de refresh tokens', async () => {
@@ -203,6 +297,13 @@ describe('Sistema de autenticação', () => {
 
     assert.equal(invalidJson.status, 400);
     assert.equal(invalidJson.body.code, 'INVALID_JSON');
+  });
+
+  it('rejeita corpo acima de 10 kb com 413', async () => {
+    const response = await register({ name: 'A'.repeat(11_000) });
+
+    assert.equal(response.status, 413);
+    assert.equal(response.body.code, 'PAYLOAD_TOO_LARGE');
   });
 
   it('retorna 503 no health check quando o banco esta fora', async () => {

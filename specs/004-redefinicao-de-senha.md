@@ -1,6 +1,6 @@
 # Spec 004 - Redefinicao de senha
 
-Status: implementada em 2026-11-23. Critérios de aceite validados por 17 testes de integração com MongoDB em memória.
+Status: implementada em 2026-11-23. Critérios de aceite validados por testes de integração com MongoDB em memória.
 
 ## Contexto
 Um usuário que esqueceu a senha precisa recuperar o acesso sem intervenção do administrador. O fluxo não pode revelar se determinado e-mail está cadastrado, e precisa encerrar as sessões antigas para que uma redefinição não deixe tokens emitidos com a senha anterior ainda válidos.

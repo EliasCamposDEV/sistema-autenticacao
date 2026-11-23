@@ -81,16 +81,17 @@ Registrar usuários e autenticar credenciais, devolvendo um par de tokens (acces
 | 409 | EMAIL_ALREADY_EXISTS | E-mail já cadastrado |
 | 429 | RATE_LIMITED | Limite de requisições excedido |
 
-## Testes esperados
-### Unitarios
-- Normalização de e-mail com maiúsculas e espaços.
-
+## Testes implementados
 ### Integracao
 - Cadastro retorna 201, tokens e usuário sem hash.
 - Hash gravado começa com `$2` e difere da senha original.
 - E-mail duplicado com caixa diferente retorna 409.
 - Corpo inválido retorna 400 com `details` para nome, e-mail e senha.
 - Login válido retorna 200 e login inválido retorna 401 para senha errada e e-mail desconhecido.
+- Conta inativa retorna 403 `ACCOUNT_DISABLED` no login.
+
+### Unitarios (planejados)
+- Normalização de e-mail com maiúsculas e espaços. O comportamento é coberto de forma integrada pelo teste de cadastro com e-mail em caixa alta.
 
 ### CI
 - `npm ci` seguido de `npm test` com `NODE_ENV=test`, segredo de teste e MongoDB em memória.

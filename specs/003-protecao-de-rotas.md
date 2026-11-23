@@ -66,15 +66,18 @@ Proteger `GET /api/v1/auth/me` com bearer token, validando assinatura, tipo, exp
 | 401 | INVALID_TOKEN | Assinatura, tipo ou usuário inválidos |
 | 404 | ROUTE_NOT_FOUND | Rota inexistente |
 
-## Testes esperados
-### Unitarios
-- `verifyAccessToken` recusa algoritmo, issuer e audience divergentes.
-
+## Testes implementados
 ### Integracao
 - `/me` sem token retorna 401 `UNAUTHORIZED`.
 - `/me` com token válido retorna os dados do usuário.
 - `/me` com token inválido retorna 401 `INVALID_TOKEN`.
+- `/me` com token expirado retorna 401 `TOKEN_EXPIRED`.
+- `/me` com token de tipo diferente de access retorna 401 `INVALID_TOKEN`.
+- `/me` com token de usuário inativo retorna 401 `INVALID_TOKEN`.
 - Rota inexistente retorna 404 `ROUTE_NOT_FOUND`.
+
+### Unitarios (planejados)
+- `verifyAccessToken` recusa algoritmo, issuer e audience divergentes.
 
 ### CI
 - `npm ci` e `npm test` com `NODE_ENV=test`.
@@ -87,7 +90,7 @@ Proteger `GET /api/v1/auth/me` com bearer token, validando assinatura, tipo, exp
 - [x] Resposta não expõe hash da senha.
 
 ## Limitacoes e riscos
-- A checagem de `active` acontece a cada requisição, então desativar a conta bloqueia o acesso imediatamente.
+- A checagem de `active` a cada requisição custa uma consulta ao banco por chamada.
 - Não há checagem de `tokenVersion`, então mudança de senha não revoga access tokens já emitidos.
 - O campo `role` viaja no token, mas ainda não é usado em decisões de autorização.
 

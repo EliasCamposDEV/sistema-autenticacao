@@ -39,6 +39,7 @@ API em http://127.0.0.1:3001, MongoDB apenas na rede interna. Para inspecionar: 
 | `NODE_ENV` | development | `production` exige `MONGODB_URI` e segredo forte |
 | `PORT` | 3000 | Porta HTTP |
 | `MONGODB_URI` | vazio | URI do MongoDB; vazio = banco em memória em dev/test |
+| `TRUST_PROXY` | 0 | Desligado por padrão; use `1` atrás de um proxy ou uma lista de IPs/redes |
 | `JWT_ACCESS_SECRET` | segredo de dev | Obrigatório em produção, mínimo 32 caracteres |
 | `ACCESS_TOKEN_TTL_SECONDS` | 900 | Validade do access token |
 | `REFRESH_TOKEN_TTL_DAYS` | 7 | Validade do refresh token |
@@ -71,7 +72,7 @@ curl -X POST http://localhost:3000/api/v1/auth/register \
   -d '{"name":"Maria Silva","email":"maria@email.com","password":"SenhaSegura123"}'
 ```
 
-Códigos de erro: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_CREDENTIALS`, `UNAUTHORIZED`, `TOKEN_EXPIRED`, `INVALID_TOKEN`, `INVALID_REFRESH_TOKEN`, `REFRESH_TOKEN_EXPIRED`, `REFRESH_TOKEN_REUSED`, `ACCOUNT_DISABLED`, `EMAIL_ALREADY_EXISTS`, `INVALID_RESET_TOKEN`, `RESET_TOKEN_USED`, `RESET_TOKEN_EXPIRED`, `RATE_LIMITED`, `ROUTE_NOT_FOUND`, `INTERNAL_ERROR`.
+Códigos de erro: `VALIDATION_ERROR`, `INVALID_JSON`, `PAYLOAD_TOO_LARGE`, `INVALID_CREDENTIALS`, `UNAUTHORIZED`, `TOKEN_EXPIRED`, `INVALID_TOKEN`, `INVALID_REFRESH_TOKEN`, `REFRESH_TOKEN_EXPIRED`, `REFRESH_TOKEN_REUSED`, `ACCOUNT_DISABLED`, `EMAIL_ALREADY_EXISTS`, `INVALID_RESET_TOKEN`, `RESET_TOKEN_USED`, `RESET_TOKEN_EXPIRED`, `RATE_LIMITED`, `ROUTE_NOT_FOUND`, `INTERNAL_ERROR`.
 
 ## Testes
 
@@ -79,7 +80,7 @@ Códigos de erro: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_CREDENTIALS`, `UN
 npm.cmd test
 ```
 
-17 testes de integração cobrem cadastro, e-mail duplicado, validação, login, rota protegida, rotação e reutilização de refresh token, logout, 404, JSON inválido, health check com o banco fora, redefinição de senha, revogação das sessões antigas, consumo único do token sob concorrência e ausência de `resetToken` em produção.
+24 testes de integração cobrem cadastro, e-mail duplicado, validação, login, conta inativa, rota protegida, access token expirado ou de tipo errado, rotação, expiração e reutilização de refresh token, rotação concorrente, logout, 404, JSON inválido, corpo acima de 10 kb, rate limit atrás de proxy, CORS, health check com o banco fora, redefinição de senha, revogação das sessões antigas, consumo único do token sob concorrência e ausência de `resetToken` em produção.
 
 ## Documentação
 
@@ -91,4 +92,6 @@ npm.cmd test
 - Rotação + família de tokens permite detectar reuso de refresh token e encerrar todas as sessões relacionadas.
 - Índice TTL remove tokens expirados automaticamente.
 - O token de redefinição só aparece na resposta com `NODE_ENV=test`; em produção ele é apenas gravado e o envio por e-mail ainda precisa ser integrado.
+- `TRUST_PROXY` deve ser configurado quando a API estiver atrás de um proxy. Com o valor errado, o rate limit e o IP registrado nas sessões podem usar o endereço do proxy.
+- `TRUST_PROXY=true` é recusado na subida porque permite burlar o rate limit por IP; informe o número de saltos ou a lista de proxies.
 - `CORS_ORIGIN` deve incluir a URL do frontend em produção.

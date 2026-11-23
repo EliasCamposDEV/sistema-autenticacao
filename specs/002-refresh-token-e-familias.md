@@ -80,17 +80,20 @@ Renovar o par de tokens com rotação atômica e detectar reuso, revogando a fam
 | 401 | REFRESH_TOKEN_EXPIRED | Token fora da validade |
 | 401 | REFRESH_TOKEN_REUSED | Token revogado ou rotação concorrente perdida |
 
-## Testes esperados
-### Unitarios
-- `hashToken` gera sempre o mesmo SHA-256 para a mesma entrada.
-- Tokens gerados em sequência são diferentes.
-
+## Testes implementados
 ### Integracao
 - Refresh devolve token novo diferente do anterior.
 - Reuso do token antigo retorna 401 `REFRESH_TOKEN_REUSED`.
 - Depois do reuso, o token novo da família também é recusado.
+- Refresh expirado retorna 401 `REFRESH_TOKEN_EXPIRED`.
+- Refresh de usuário inativo retorna 401 `INVALID_REFRESH_TOKEN` e revoga a família.
+- Rotação concorrente produz um 200 e um 401 e encerra a família.
 - Logout retorna 204 e invalida o token da família.
 - Logout com token desconhecido retorna 204.
+
+### Unitarios (planejados)
+- `hashToken` gera sempre o mesmo SHA-256 para a mesma entrada.
+- Tokens gerados em sequência são diferentes.
 
 ### CI
 - `npm ci` e `npm test`, sem dependência de MongoDB externo.
@@ -101,12 +104,12 @@ Renovar o par de tokens com rotação atômica e detectar reuso, revogando a fam
 - [x] Reuso encerra a família inteira.
 - [x] Rotação concorrente é tratada com atualização condicional.
 - [x] Logout revoga a família e é idempotente.
-- [x] TTL do MongoDB remove tokens expirados.
+- [x] Índice TTL configurado em `expiresAt`.
 
 ## Limitacoes e riscos
 - Access tokens já emitidos continuam válidos até expirar, mesmo após logout ou reuso.
 - A revogação por família depende da disponibilidade do MongoDB no momento da rotação.
-- O detecta reuso não distingue ataque legítimo de cliente com relógio ou retry duplicado.
+- A detecção de reuso não distingue ataque legítimo de cliente com relógio ou retry duplicado.
 
 ## Decisoes
 - Refresh opaco em vez de JWT: permite revogação sem esperar expiração e reduz superfície de claims expostas.
